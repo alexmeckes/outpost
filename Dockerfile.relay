@@ -14,7 +14,6 @@ COPY --from=build /outpost /usr/local/bin/outpost
 
 USER outpost
 EXPOSE 8787
-VOLUME ["/data"]
 
 ENV OUTPOST_RELAY_REGISTRY=/data/relay_endpoints.json
 
