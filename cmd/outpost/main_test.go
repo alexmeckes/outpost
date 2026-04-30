@@ -83,6 +83,57 @@ func TestPrepareHostedRelayBundle(t *testing.T) {
 	}
 }
 
+func TestPrepareHostedRelayBundleRailway(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "bundle")
+	result, err := prepareHostedRelayBundle(hostedRelayPrepareOptions{
+		Dir:              dir,
+		RelayURL:         "https://outpost-production.up.railway.app",
+		Platform:         "railway",
+		Slug:             "demo",
+		DeviceID:         "od_testdevice",
+		AgentToken:       "ort_test",
+		PublicToken:      "orp_public",
+		PublicAuthHeader: "X-Outpost-Relay-Token",
+		SourceDir:        t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Platform != "railway" {
+		t.Fatalf("Platform = %q, want railway", result.Platform)
+	}
+	for _, name := range []string{"railway", "railway_env"} {
+		if _, err := os.Stat(result.Files[name]); err != nil {
+			t.Fatalf("%s file missing: %v", name, err)
+		}
+	}
+
+	config, err := os.ReadFile(result.Files["railway"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(config), `"healthcheckPath": "/healthz"`) {
+		t.Fatalf("railway config missing healthcheck:\n%s", config)
+	}
+
+	envData, err := os.ReadFile(result.Files["railway_env"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"OUTPOST_RELAY_TOKEN=ort_test",
+		"OUTPOST_RELAY_ENDPOINTS_B64=",
+		"RAILWAY_DOCKERFILE_PATH=Dockerfile.relay",
+	} {
+		if !strings.Contains(string(envData), want) {
+			t.Fatalf("railway env missing %q in:\n%s", want, envData)
+		}
+	}
+	if strings.Contains(string(envData), "orp_public") {
+		t.Fatalf("railway env should not contain client public token:\n%s", envData)
+	}
+}
+
 func TestLoadRelayReservationsFromEnv(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "bundle")
 	result, err := prepareHostedRelayBundle(hostedRelayPrepareOptions{
@@ -122,5 +173,17 @@ func TestLoadRelayReservationsFromEnv(t *testing.T) {
 	}
 	if !strings.Contains(source, "OUTPOST_RELAY_ENDPOINTS_B64") {
 		t.Fatalf("source did not mention env registry: %s", source)
+	}
+}
+
+func TestDefaultRelayListenAddrUsesRailwayPort(t *testing.T) {
+	t.Setenv("PORT", "12345")
+	if got := defaultRelayListenAddr(); got != "0.0.0.0:12345" {
+		t.Fatalf("defaultRelayListenAddr = %q, want Railway PORT", got)
+	}
+
+	t.Setenv("OUTPOST_RELAY_LISTEN", "127.0.0.1:9999")
+	if got := defaultRelayListenAddr(); got != "127.0.0.1:9999" {
+		t.Fatalf("defaultRelayListenAddr = %q, want explicit listen", got)
 	}
 }

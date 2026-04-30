@@ -177,9 +177,19 @@ func NewRelayHubWithOptions(opts RelayHubOptions) *RelayHub {
 
 func (h *RelayHub) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", h.handleHealth)
 	mux.HandleFunc("/_outpost/connect", h.handleConnect)
 	mux.HandleFunc("/", h.handlePublic)
 	return mux
+}
+
+func (h *RelayHub) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
 
 func (h *RelayHub) handleConnect(w http.ResponseWriter, r *http.Request) {

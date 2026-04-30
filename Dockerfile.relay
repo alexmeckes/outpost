@@ -16,7 +16,6 @@ USER outpost
 EXPOSE 8787
 VOLUME ["/data"]
 
-ENV OUTPOST_RELAY_LISTEN=0.0.0.0:8787
 ENV OUTPOST_RELAY_REGISTRY=/data/relay_endpoints.json
 
 ENTRYPOINT ["outpost"]

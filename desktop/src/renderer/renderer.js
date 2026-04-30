@@ -60,6 +60,7 @@ const els = {
   connectionStatus: document.querySelector('#connectionStatus'),
   copyButtons: document.querySelectorAll('[data-copy-key]'),
   relayProfile: document.querySelector('#relayProfile'),
+  hostedTarget: document.querySelector('#hostedTarget'),
   publishRelayUrl: document.querySelector('#publishRelayUrl'),
   publishSlug: document.querySelector('#publishSlug'),
   publishRelayToken: document.querySelector('#publishRelayToken'),
@@ -115,6 +116,7 @@ els.copyButtons.forEach((button) => {
   button.addEventListener('click', () => copyConfigValue(button));
 });
 els.relayProfile.addEventListener('change', applyRelayProfile);
+els.hostedTarget.addEventListener('change', applyRelayProfile);
 els.relayListen.addEventListener('input', syncRelayURL);
 els.relayToken.addEventListener('input', syncRelayToken);
 els.prepareHostedRelayButton.addEventListener('click', prepareHostedRelay);
@@ -318,6 +320,7 @@ function readRelayForm() {
   const relayToken = els.relayToken.value.trim();
   return {
     profile: els.relayProfile.value,
+    hostedTarget: els.hostedTarget.value,
     listen: els.relayListen.value.trim(),
     relayURL: els.publishRelayUrl.value.trim(),
     relayToken,
@@ -338,6 +341,7 @@ function renderBackend(backend) {
 function renderRelaySettings(settings) {
   const profile = settings.profile === 'hosted' ? 'hosted' : 'local';
   els.relayProfile.value = profile;
+  els.hostedTarget.value = settings.hostedTarget || settings.platform || 'railway';
   els.relayListen.value = settings.listen || '127.0.0.1:8787';
   els.relayToken.value = settings.relayToken || settings.publishRelayToken || '';
   els.publishRelayToken.value = settings.publishRelayToken || settings.relayToken || '';
@@ -408,7 +412,9 @@ function applyRelayProfile() {
   if (local) {
     syncRelayURL();
   } else if (!els.publishRelayUrl.value || els.publishRelayUrl.value === `http://${els.relayListen.value}`) {
-    els.publishRelayUrl.value = 'https://your-relay.example.com';
+    els.publishRelayUrl.value = els.hostedTarget.value === 'railway'
+      ? 'https://your-service.up.railway.app'
+      : 'https://your-relay.example.com';
   }
   syncRelayToken();
   renderProcessState(state.processes || {});
@@ -885,6 +891,7 @@ function createPreviewOutpost() {
       relayToken: 'ort_preview',
       publishRelayToken: 'ort_preview',
       slug: 'demo',
+      hostedTarget: 'railway',
       publicRelayToken: '',
       publicAuthHeader: 'X-Outpost-Relay-Token',
     },
@@ -1071,6 +1078,7 @@ function createPreviewOutpost() {
         publishRelayToken: input.relayToken || 'ort_preview_hosted',
         publicRelayToken: input.publicRelayToken || 'orp_preview_public',
         publicAuthHeader: input.publicAuthHeader || 'X-Outpost-Relay-Token',
+        hostedTarget: input.hostedTarget || 'railway',
       };
       return {
         ok: true,

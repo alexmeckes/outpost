@@ -329,7 +329,7 @@ func relay(args []string) error {
 	case "serve":
 		flags := flag.NewFlagSet("relay serve", flag.ContinueOnError)
 		var reservations relayReservationFlags
-		listen := flags.String("listen", envOrDefault("OUTPOST_RELAY_LISTEN", outpost.DefaultRelayListenAddr), "relay listen address")
+		listen := flags.String("listen", defaultRelayListenAddr(), "relay listen address")
 		token := flags.String("token", envOrDefault("OUTPOST_RELAY_TOKEN", outpost.DefaultRelayToken), "agent bearer token")
 		publicToken := flags.String("public-token", envOrDefault("OUTPOST_RELAY_PUBLIC_TOKEN", ""), "optional relay-side public request token")
 		publicAuthHeader := flags.String("public-auth-header", envOrDefault("OUTPOST_RELAY_PUBLIC_AUTH_HEADER", outpost.DefaultRelayPublicAuthHeader), "header used for relay-side public request auth")
@@ -413,6 +413,7 @@ func relayHosted(args []string) error {
 	flags := flag.NewFlagSet("relay hosted prepare", flag.ContinueOnError)
 	dir := flags.String("dir", "outpost-hosted-relay", "directory for generated hosted relay files")
 	relayURL := flags.String("relay", envOrDefault("OUTPOST_RELAY_URL", "https://your-relay.example.com"), "public hosted relay URL")
+	platform := flags.String("platform", "docker", "hosted target: docker or railway")
 	slug := flags.String("slug", envOrDefault("OUTPOST_RELAY_SLUG", outpost.DefaultRelaySlug), "public relay slug")
 	deviceID := flags.String("device", "local", "device ID to reserve, or local")
 	agentToken := flags.String("agent-token", envOrDefault("OUTPOST_RELAY_TOKEN", "auto"), "hosted relay agent token: auto or explicit token")
@@ -437,6 +438,7 @@ func relayHosted(args []string) error {
 	result, err := prepareHostedRelayBundle(hostedRelayPrepareOptions{
 		Dir:              *dir,
 		RelayURL:         *relayURL,
+		Platform:         *platform,
 		Slug:             *slug,
 		DeviceID:         resolvedDeviceID,
 		AgentToken:       *agentToken,
@@ -606,6 +608,7 @@ func relayEndpoint(args []string) error {
 type hostedRelayPrepareOptions struct {
 	Dir              string
 	RelayURL         string
+	Platform         string
 	Slug             string
 	DeviceID         string
 	AgentToken       string
@@ -618,6 +621,7 @@ type hostedRelayPrepareOptions struct {
 type hostedRelayPrepareResult struct {
 	BundleDir        string            `json:"bundle_dir"`
 	RelayURL         string            `json:"relay_url"`
+	Platform         string            `json:"platform"`
 	Slug             string            `json:"slug"`
 	DeviceID         string            `json:"device_id"`
 	AgentToken       string            `json:"agent_token"`
@@ -640,6 +644,13 @@ func prepareHostedRelayBundle(opts hostedRelayPrepareOptions) (hostedRelayPrepar
 	relayURL := strings.TrimRight(strings.TrimSpace(opts.RelayURL), "/")
 	if relayURL == "" {
 		relayURL = "https://your-relay.example.com"
+	}
+	platform := strings.TrimSpace(strings.ToLower(opts.Platform))
+	if platform == "" {
+		platform = "docker"
+	}
+	if platform != "docker" && platform != "railway" {
+		return hostedRelayPrepareResult{}, fmt.Errorf("unsupported hosted relay platform %q", opts.Platform)
 	}
 	slug := outpost.NormalizeRelaySlug(opts.Slug)
 	if slug == "" {
@@ -700,6 +711,10 @@ func prepareHostedRelayBundle(opts hostedRelayPrepareOptions) (hostedRelayPrepar
 		"registry": filepath.Join(bundleDir, "relay_endpoints.json"),
 		"readme":   filepath.Join(bundleDir, "README.md"),
 	}
+	if platform == "railway" {
+		files["railway"] = filepath.Join(bundleDir, "railway.json")
+		files["railway_env"] = filepath.Join(bundleDir, "railway.env")
+	}
 
 	if err := os.MkdirAll(bundleDir, 0o700); err != nil {
 		return hostedRelayPrepareResult{}, err
@@ -713,10 +728,19 @@ func prepareHostedRelayBundle(opts hostedRelayPrepareOptions) (hostedRelayPrepar
 	if err := writeHostedFile(files["compose"], []byte(hostedRelayComposeFile(sourceDir)), 0o644, opts.Force); err != nil {
 		return hostedRelayPrepareResult{}, err
 	}
+	if platform == "railway" {
+		if err := writeHostedFile(files["railway"], []byte(hostedRelayRailwayConfig()), 0o644, opts.Force); err != nil {
+			return hostedRelayPrepareResult{}, err
+		}
+		if err := writeHostedFile(files["railway_env"], []byte(hostedRelayRailwayEnvFile(agentToken, registryB64)), 0o600, opts.Force); err != nil {
+			return hostedRelayPrepareResult{}, err
+		}
+	}
 
 	result := hostedRelayPrepareResult{
 		BundleDir:        bundleDir,
 		RelayURL:         relayURL,
+		Platform:         platform,
 		Slug:             endpoint.Slug,
 		DeviceID:         endpoint.DeviceID,
 		AgentToken:       agentToken,
@@ -740,6 +764,33 @@ func hostedRelayEnvFile(agentToken string, registryB64 string) string {
 		"OUTPOST_RELAY_ENDPOINTS_B64=" + registryB64,
 		"",
 	}, "\n")
+}
+
+func hostedRelayRailwayEnvFile(agentToken string, registryB64 string) string {
+	return strings.Join([]string{
+		"OUTPOST_RELAY_TOKEN=" + agentToken,
+		"OUTPOST_RELAY_ENDPOINTS_B64=" + registryB64,
+		"RAILWAY_DOCKERFILE_PATH=Dockerfile.relay",
+		"RAILWAY_HEALTHCHECK_TIMEOUT_SEC=300",
+		"",
+	}, "\n")
+}
+
+func hostedRelayRailwayConfig() string {
+	return `{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile.relay"
+  },
+  "deploy": {
+    "healthcheckPath": "/healthz",
+    "healthcheckTimeout": 300,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+`
 }
 
 func hostedRelayComposeFile(sourceDir string) string {
@@ -766,12 +817,6 @@ func hostedRelayReadme(result hostedRelayPrepareResult, sourceDir string) string
 	lines := []string{
 		"# Outpost Hosted Relay",
 		"",
-		"Start the relay:",
-		"",
-		"```sh",
-		"docker compose up --build",
-		"```",
-		"",
 		"Outpost desktop settings:",
 		"",
 		"```text",
@@ -786,6 +831,26 @@ func hostedRelayReadme(result hostedRelayPrepareResult, sourceDir string) string
 		"```text",
 		result.BaseURL,
 		"```",
+	}
+	if result.Platform == "railway" {
+		lines = append(lines,
+			"",
+			"Railway deploy:",
+			"",
+			"1. Create a Railway service from the Outpost GitHub repo.",
+			"2. Railway will use `railway.json` and `Dockerfile.relay` from the repo root.",
+			"3. Paste the variables from `railway.env` into the service Variables tab.",
+			"4. After Railway gives you a public domain, set Relay URL in the desktop app to that HTTPS URL.",
+		)
+	} else {
+		lines = append(lines,
+			"",
+			"Start the relay:",
+			"",
+			"```sh",
+			"docker compose up --build",
+			"```",
+		)
 	}
 	if result.PublicToken != "" {
 		lines = append(lines,
@@ -813,6 +878,7 @@ func hostedRelayReadme(result hostedRelayPrepareResult, sourceDir string) string
 
 func printHostedRelayPrepareSummary(w io.Writer, result hostedRelayPrepareResult) {
 	fmt.Fprintln(w, "Prepared hosted relay bundle:", result.BundleDir)
+	fmt.Fprintln(w, "Platform:", result.Platform)
 	fmt.Fprintln(w, "Relay URL:", result.RelayURL)
 	fmt.Fprintln(w, "OpenAI base URL:", result.BaseURL)
 	fmt.Fprintln(w, "Relay device:", result.DeviceID)
@@ -825,9 +891,15 @@ func printHostedRelayPrepareSummary(w io.Writer, result hostedRelayPrepareResult
 		fmt.Fprintf(w, "  Relay header: %s: Bearer %s\n", result.PublicAuthHeader, result.PublicToken)
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Start the hosted relay with:")
-	fmt.Fprintln(w, "  cd", result.BundleDir)
-	fmt.Fprintln(w, "  docker compose up --build")
+	if result.Platform == "railway" {
+		fmt.Fprintln(w, "Railway variables:")
+		fmt.Fprintln(w, "  Paste", result.Files["railway_env"], "into the Railway service Variables tab.")
+		fmt.Fprintln(w, "  After deploy, copy the Railway public domain into the desktop Relay URL.")
+	} else {
+		fmt.Fprintln(w, "Start the hosted relay with:")
+		fmt.Fprintln(w, "  cd", result.BundleDir)
+		fmt.Fprintln(w, "  docker compose up --build")
+	}
 }
 
 func writeHostedFile(path string, data []byte, perm os.FileMode, force bool) error {
@@ -1112,6 +1184,16 @@ func envOrDefault(name string, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func defaultRelayListenAddr() string {
+	if listen := strings.TrimSpace(os.Getenv("OUTPOST_RELAY_LISTEN")); listen != "" {
+		return listen
+	}
+	if port := strings.TrimSpace(os.Getenv("PORT")); port != "" {
+		return "0.0.0.0:" + port
+	}
+	return outpost.DefaultRelayListenAddr
 }
 
 func envBool(name string, fallback bool) bool {

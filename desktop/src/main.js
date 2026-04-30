@@ -481,6 +481,8 @@ async function prepareHostedRelay(input) {
     'prepare',
     '--dir',
     bundleDir,
+    '--platform',
+    input.hostedTarget || input.platform || 'railway',
     '--relay',
     current.relayURL || 'https://your-relay.example.com',
     '--slug',
@@ -514,6 +516,7 @@ async function prepareHostedRelay(input) {
 
   const relaySettings = await saveRelaySettings({
     profile: 'hosted',
+    hostedTarget: prepared.platform || input.hostedTarget || input.platform || 'railway',
     relayURL: prepared.relay_url,
     relayToken: prepared.agent_token,
     publishRelayToken: prepared.agent_token,
@@ -1078,9 +1081,11 @@ function normalizeRelaySettings(input = {}) {
   const slug = normalizeRelaySlug(input.slug || defaultSlug);
   const publicRelayToken = String(input.publicRelayToken || '').trim();
   const publicAuthHeader = String(input.publicAuthHeader || defaultRelayPublicAuthHeader).trim() || defaultRelayPublicAuthHeader;
+  const hostedTarget = input.hostedTarget === 'docker' || input.platform === 'docker' ? 'docker' : 'railway';
 
   return {
     profile,
+    hostedTarget,
     listen,
     relayURL,
     relayToken,

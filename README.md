@@ -16,6 +16,7 @@ The project is early, but the core loop works:
 - relay publishing for a public slug URL
 - Electron control surface for setup, health checks, and copyable client config
 - hosted relay bundle generation for Docker deployment
+- Railway-ready relay deployment config
 
 ## How It Works
 
@@ -59,7 +60,8 @@ the local machine initiates the outbound agent connection.
   - LM Studio: usually `http://127.0.0.1:1234/v1`
   - any OpenAI-compatible local server
 
-Docker is optional, and only needed for the hosted relay bundle.
+Docker is optional, and only needed for the hosted relay bundle or Railway's
+Dockerfile build.
 
 ## Build
 
@@ -250,6 +252,39 @@ and connects the relay agent with reconnect/backoff:
 Use `--once` for old-school one-shot development behavior.
 
 ## Hosted Relay
+
+### Railway
+
+Railway is the first recommended hosted target. The repo includes
+`railway.json`, which tells Railway to build `Dockerfile.relay`, run the relay
+container, and use `/healthz` as the deploy health check. The relay listens on
+Railway's injected `PORT` automatically.
+
+Generate Railway variables:
+
+```sh
+./outpost relay hosted prepare \
+  --platform railway \
+  --relay https://your-service.up.railway.app \
+  --slug demo \
+  --dir deploy/relay/generated \
+  --force
+```
+
+Then:
+
+1. Create a Railway service from this GitHub repo.
+2. Paste `deploy/relay/generated/railway.env` into the Railway service
+   Variables tab.
+3. Deploy the service.
+4. Copy the Railway public domain into the desktop app's Hosted Relay URL.
+5. Press Start all in the desktop app to publish your local model to that relay.
+
+Railway gives the public URL only after the service is created, so it is fine
+to generate the bundle with a placeholder URL first and update the desktop Relay
+URL after deploy.
+
+### Docker
 
 Generate a Docker-ready hosted relay bundle:
 

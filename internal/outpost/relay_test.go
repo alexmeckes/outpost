@@ -267,6 +267,27 @@ func TestRelayUsesEndpointPublicToken(t *testing.T) {
 	}
 }
 
+func TestRelayHealthcheck(t *testing.T) {
+	relay := httptest.NewServer(NewRelayHub("dev-token").Handler())
+	defer relay.Close()
+
+	resp, err := http.Get(relay.URL + "/healthz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("health status = %d, body = %s", resp.StatusCode, body)
+	}
+	if !strings.Contains(string(body), `"ok":true`) {
+		t.Fatalf("health body = %s", body)
+	}
+}
+
 func TestRelayRejectsWrongReservedDevice(t *testing.T) {
 	hub := NewRelayHubWithOptions(RelayHubOptions{
 		AgentToken: "agent-secret",
