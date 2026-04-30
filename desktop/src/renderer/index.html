@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Outpost</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div>
+            <h1>Outpost</h1>
+            <p id="binaryPath"></p>
+          </div>
+        </div>
+        <div class="status-strip">
+          <span id="relayState" class="pill">Relay stopped</span>
+          <span id="publishState" class="pill">Publish stopped</span>
+          <button id="refreshButton" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <section class="meta">
+        <div>
+          <span>Device</span>
+          <strong id="deviceId">-</strong>
+        </div>
+        <div>
+          <span>Registry</span>
+          <strong id="registryPath">-</strong>
+        </div>
+      </section>
+
+      <section class="panel backend-panel">
+        <div class="panel-heading">
+          <h2>Backend</h2>
+          <div class="button-row">
+            <button id="testBackendButton" type="button" class="quiet">Test</button>
+            <button id="saveBackendButton" type="button">Save</button>
+          </div>
+        </div>
+        <div class="backend-grid">
+          <label>
+            <span>Provider</span>
+            <select id="backendType">
+              <option value="ollama">Ollama</option>
+              <option value="lmstudio">LM Studio</option>
+              <option value="openai-compatible">OpenAI-compatible</option>
+            </select>
+          </label>
+          <label>
+            <span>Base URL</span>
+            <input id="backendBaseUrl" value="http://127.0.0.1:11434" autocomplete="off" />
+          </label>
+          <label>
+            <span>API key</span>
+            <input id="backendApiKey" placeholder="optional" autocomplete="off" />
+          </label>
+        </div>
+        <div id="backendStatus" class="test-status">Not checked</div>
+        <details class="backend-guide">
+          <summary>Backend guide</summary>
+          <div class="guide-grid">
+            <div>
+              <strong>Ollama</strong>
+              <span>Use http://127.0.0.1:11434 after Ollama is running.</span>
+            </div>
+            <div>
+              <strong>LM Studio</strong>
+              <span>Start the local server, then use http://127.0.0.1:1234/v1.</span>
+            </div>
+            <div>
+              <strong>Other local APIs</strong>
+              <span>Point at any OpenAI-compatible /v1 server.</span>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel models-panel">
+        <div class="panel-heading">
+          <h2>Models</h2>
+          <div class="button-row">
+            <button id="refreshModelsButton" type="button" class="quiet">Refresh</button>
+            <button id="saveModelAliasButton" type="button">Use alias</button>
+          </div>
+        </div>
+        <div class="model-grid">
+          <label>
+            <span>Loaded model</span>
+            <select id="modelSelect">
+              <option value="">No models loaded</option>
+            </select>
+          </label>
+          <label>
+            <span>Alias</span>
+            <input id="modelAliasName" value="outpost-default" readonly />
+          </label>
+          <label>
+            <span>Prompt</span>
+            <input id="testPrompt" value="Reply with the single word: outpost" autocomplete="off" />
+          </label>
+        </div>
+        <div class="model-actions">
+          <button id="testInferenceButton" type="button" class="quiet">Test prompt</button>
+          <div id="modelStatus" class="test-status">Not loaded</div>
+        </div>
+        <div id="inferenceRows" class="inference-list"></div>
+      </section>
+
+      <section class="panel readiness-panel">
+        <div class="panel-heading">
+          <h2>Readiness</h2>
+          <button id="runDiagnosticsButton" type="button" class="quiet">Check</button>
+        </div>
+        <div id="diagnosticsRows" class="diagnostics-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Endpoint</h2>
+          <button id="createEndpointButton" type="button">Create</button>
+        </div>
+        <div class="endpoint-row">
+          <label>
+            <span>Slug</span>
+            <input id="endpointSlug" value="demo" autocomplete="off" />
+          </label>
+          <label>
+            <span>Public token</span>
+            <select id="endpointToken">
+              <option value="auto">auto</option>
+              <option value="none">none</option>
+            </select>
+          </label>
+          <label class="checkline">
+            <input id="endpointReplace" type="checkbox" />
+            <span>Replace</span>
+          </label>
+        </div>
+        <input id="endpointDevice" type="hidden" value="local" />
+        <div id="endpointTokenOutput" class="secret-output"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Slug</th>
+              <th>Token</th>
+              <th>Device</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="endpointRows"></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Run</h2>
+          <div class="button-row">
+            <button id="stopEverythingButton" type="button" class="quiet" disabled>Stop all</button>
+            <button id="startEverythingButton" type="button" class="primary-action">Start all</button>
+          </div>
+        </div>
+        <div class="run-grid">
+          <div class="run-item">
+            <strong>Relay</strong>
+            <div class="button-row">
+              <button id="startRelayButton" type="button">Start</button>
+              <button id="stopRelayButton" type="button" class="quiet">Stop</button>
+            </div>
+          </div>
+          <div class="run-item">
+            <strong>Publish</strong>
+            <div class="button-row">
+              <button id="startPublishButton" type="button">Start</button>
+              <button id="stopPublishButton" type="button" class="quiet">Stop</button>
+            </div>
+          </div>
+        </div>
+
+        <details class="settings">
+          <summary>Settings</summary>
+          <div class="settings-grid">
+            <label>
+              <span>Relay profile</span>
+              <select id="relayProfile">
+                <option value="local">Local relay</option>
+                <option value="hosted">Hosted relay</option>
+              </select>
+            </label>
+            <label>
+              <span>Relay listen</span>
+              <input id="relayListen" value="127.0.0.1:8787" autocomplete="off" />
+            </label>
+            <label>
+              <span>Agent token</span>
+              <input id="relayToken" placeholder="generated" autocomplete="off" />
+            </label>
+            <label>
+              <span>Relay URL</span>
+              <input id="publishRelayUrl" value="http://127.0.0.1:8787" autocomplete="off" />
+            </label>
+            <label>
+              <span>Publish slug</span>
+              <input id="publishSlug" value="demo" autocomplete="off" />
+            </label>
+            <label>
+              <span>API key</span>
+              <input id="publishApiKey" placeholder="auto" autocomplete="off" />
+            </label>
+            <label class="hosted-field">
+              <span>Public token</span>
+              <input id="publicRelayToken" placeholder="from bundle" autocomplete="off" />
+            </label>
+            <label class="hosted-field">
+              <span>Public header</span>
+              <input id="publicAuthHeader" value="X-Outpost-Relay-Token" autocomplete="off" />
+            </label>
+            <input id="publishRelayToken" type="hidden" value="" />
+          </div>
+          <div class="settings-actions hosted-field">
+            <button id="prepareHostedRelayButton" type="button" class="quiet">Prepare hosted</button>
+            <div id="hostedBundleStatus" class="test-status">Not prepared</div>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel connection-panel">
+        <div class="panel-heading">
+          <h2>Client config</h2>
+          <button id="testConnectionButton" type="button" class="quiet" disabled>Test</button>
+        </div>
+        <div class="config-list">
+          <div class="config-row">
+            <span>Base URL</span>
+            <code id="connectionBaseUrl">Not ready</code>
+            <button type="button" class="quiet copy-button" data-copy-key="baseURL" disabled>Copy</button>
+          </div>
+          <div class="config-row">
+            <span>API key</span>
+            <code id="connectionApiKey">Not ready</code>
+            <button type="button" class="quiet copy-button" data-copy-key="apiKey" disabled>Copy</button>
+          </div>
+          <div class="config-row">
+            <span>Authorization</span>
+            <code id="connectionAuthorization">Not ready</code>
+            <button type="button" class="quiet copy-button" data-copy-key="authorizationHeader" disabled>Copy</button>
+          </div>
+          <div id="connectionRelayHeaderRow" class="config-row" hidden>
+            <span>Relay header</span>
+            <code id="connectionRelayHeader">Not ready</code>
+            <button type="button" class="quiet copy-button" data-copy-key="publicRelayHeader" disabled>Copy</button>
+          </div>
+        </div>
+        <div id="connectionWarning" class="notice" hidden></div>
+        <div id="connectionStatus" class="test-status">Not ready</div>
+      </section>
+
+      <section class="panel trace-panel">
+        <div class="panel-heading">
+          <h2>Trace</h2>
+          <div class="button-row">
+            <label class="checkline trace-live">
+              <input id="traceAutoRefresh" type="checkbox" checked />
+              <span>Live</span>
+            </label>
+            <button id="refreshTraceButton" type="button" class="quiet">Refresh</button>
+          </div>
+        </div>
+        <div id="traceRows" class="trace-list"></div>
+        <div id="traceStatus" class="test-status">No requests yet</div>
+      </section>
+
+      <section class="log-panel">
+        <div class="panel-heading">
+          <h2>Log</h2>
+          <button id="clearLogButton" type="button" class="quiet">Clear</button>
+        </div>
+        <pre id="processLog"></pre>
+      </section>
+
+      <details class="raw-status">
+        <summary>Status</summary>
+        <pre id="statusOutput"></pre>
+      </details>
+    </main>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

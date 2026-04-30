@@ -1,0 +1,12 @@
+services:
+  relay:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.relay
+    env_file:
+      - relay.env
+    volumes:
+      - ./relay_endpoints.json:/data/relay_endpoints.json:ro
+    ports:
+      - "8787:8787"
+    restart: unless-stopped

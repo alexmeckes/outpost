@@ -1,0 +1,66 @@
+{
+  "name": "outpost-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop control surface for Outpost.",
+  "author": "Outpost",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "icons": "node scripts/create-icons.js",
+    "build:binary": "cd .. && go build -o outpost ./cmd/outpost",
+    "pack": "npm run icons && npm run build:binary && electron-builder --dir",
+    "dist": "npm run icons && npm run build:binary && electron-builder --mac dmg"
+  },
+  "build": {
+    "appId": "dev.outpost.desktop",
+    "productName": "Outpost",
+    "asar": true,
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../outpost",
+        "to": "outpost"
+      },
+      {
+        "from": "../Dockerfile.relay",
+        "to": "relay-source/Dockerfile.relay"
+      },
+      {
+        "from": "../go.mod",
+        "to": "relay-source/go.mod"
+      },
+      {
+        "from": "../go.sum",
+        "to": "relay-source/go.sum"
+      },
+      {
+        "from": "../cmd",
+        "to": "relay-source/cmd"
+      },
+      {
+        "from": "../internal",
+        "to": "relay-source/internal"
+      },
+      {
+        "from": "build/trayTemplate.png",
+        "to": "trayTemplate.png"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns"
+    }
+  },
+  "devDependencies": {
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1"
+  }
+}
